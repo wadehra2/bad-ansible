@@ -1,0 +1,140 @@
+--- 
+- 
+  become: true
+  gather_facts: false
+  hosts: all
+  name: configuration
+  tasks: 
+    - 
+      name: "enable repos"
+      template: 
+        dest: /etc/yum.repos.d/open_three-tier-app.repo
+        mode: 420
+        src: ./open_three-tier-app.repo
+- 
+  become: true
+  gather_facts: false
+  hosts: frontends
+  name: "deploy haproxy"
+  tasks: 
+    - 
+      name: http
+      package: 
+        name: httpie
+        state: latest
+    - 
+      name: "install HAProxy"
+      yum: "name=haproxy state=latest"
+    - 
+      name: "enable HAProxy"
+      service: 
+        name: haproxy
+        state: started
+    - 
+      name: "configure haproxy"
+      template: 
+        dest: /etc/haproxy/haproxy.cfg
+        src: ./haproxy.cfg.j2
+    - 
+      name: "restart HAproxy"
+      service: 
+        name: haproxy
+        state: restarted
+- 
+  become: true
+  gather_facts: false
+  hosts: apps
+  name: "deploy tomcat"
+  tasks: 
+    - 
+      name: "install tomcat"
+      package: 
+        name: tomcat
+        state: latest
+    - 
+      name: "enable tomcat at boot"
+      service: 
+        enabled: true
+        name: tomcat
+    - 
+      file: 
+        path: /usr/share/tomcat/webapps/ansible
+        state: directory
+      name: "create ansible tomcat directory"
+    - 
+      name: "copy static index.html to tomcat webapps/ansible/index.html"
+      template: 
+        dest: /usr/share/tomcat/webapps/ansible/index.html
+        mode: 420
+        src: index.html.j2
+    - 
+      name: "start tomcat"
+      service: 
+        name: tomcat
+        state: started
+- 
+  become: true
+  gather_facts: false
+  hosts: app1
+  name: "index.html on app 1"
+  tasks: 
+    - 
+      name: "copy static index.html to tomcat webapps/ansible/index.html"
+      template: 
+        dest: /usr/share/tomcat/webapps/ansible/index.html
+        src: index.html.app1
+- 
+  become: true
+  gather_facts: false
+  hosts: app2
+  name: "index.html on app 1"
+  tasks: 
+    - 
+      name: "copy static index.html to tomcat webapps/ansible/index.html"
+      template: 
+        dest: /usr/share/tomcat/webapps/ansible/index.html
+        src: index.html.app2
+- 
+  become: true
+  gather_facts: false
+  hosts: appdbs
+  name: "deploy postgres"
+  tasks: 
+    - 
+      command: "yum install -y postgresql-server"
+      name: "install progress"
+    - 
+      name: "enable apache at boot"
+      service: 
+        enabled: true
+        name: postgresql
+    - 
+      debug: 
+        msg: "Either uncomment the postgres setup or manually login and initialize"
+      name: "tell user to finish setting up postgres"
+    - 
+      name: "start postgres"
+      service: 
+        name: postgresql.service
+        state: started
+- 
+  become: true
+  gather_facts: false
+  hosts: apps
+  name: "deploy apache"
+  tasks: 
+    - 
+      name: "install apache"
+      yum: 
+        name: httpd
+        state: latest
+    - 
+      name: "enable apache at boot"
+      service: 
+        enabled: true
+        name: httpd
+    - 
+      name: "start apache"
+      service: 
+        name: httpd
+        state: started
